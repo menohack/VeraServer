@@ -3,6 +3,7 @@ using System;
 using System.Net.Sockets;
 using System.Collections.Generic;
 using System.Text;
+using System.IO;
 
 namespace VeraServer
 {
@@ -78,10 +79,11 @@ namespace VeraServer
 			try
 			{
 				stream = client.GetStream();
-				StateContext context = new StateContext(this);
-
-				while (true)
-					context.Next();
+				StreamWriter writer = new StreamWriter(stream);
+				writer.Write("HTTP/1.1 200 OK\n\r\n");
+				writer.WriteLine("hello world!");
+				writer.Close();
+				//closeServer(this);
 			}
 			catch (Exception e)
 			{
@@ -162,184 +164,6 @@ namespace VeraServer
 		private void Write(byte[] buffer, int offset, int size)
 		{
 			stream.Write(buffer, 0, size);
-		}
-
-		/// <summary>
-		/// The StateContext class is used to facilitate state transitions.
-		/// </summary>
-		class StateContext
-		{
-			/// <summary>
-			/// The current state, starting with AuthenticationState.
-			/// </summary>
-			private NetworkState state = new AuthenticationState();
-
-			/// <summary>
-			/// A reference to the server that holds this state.
-			/// </summary>
-			private Server server;
-
-			/// <summary>
-			/// Default constructor.
-			/// </summary>
-			/// <param name="server">The server that holds this state.</param>
-			public StateContext(Server server)
-			{
-				this.server = server;
-			}
-
-			/// <summary>
-			/// Transition to the next state.
-			/// </summary>
-			public void Next()
-			{
-				state.Receive(server);
-				state = state.Send(server);
-			}
-		}
-
-		/// <summary>
-		/// The NetworkState interface specifies the two methods of every State class.
-		/// </summary>
-		interface NetworkState
-		{
-			NetworkState Send(Server server);
-			void Receive(Server server);
-		}
-
-		/// <summary>
-		/// The AuthenticationState is the first state, when the client and server confirm that
-		/// they are the right game.
-		/// </summary>
-		class AuthenticationState : NetworkState
-		{
-			private const int AUTHENTICATION_CLIENT_VALUE = 390458;
-			private const int AUTHENTICATION_SERVER_VALUE = -283947;
-
-			public NetworkState Send(Server server)
-			{
-				server.Write(BitConverter.GetBytes(AUTHENTICATION_SERVER_VALUE), 0, 4);
-				//Console.WriteLine("Authentication successful!");
-
-				return new UsernameAndPasswordState();
-			}
-			public void Receive(Server server)
-			{
-				int value = server.ReadInt();
-
-				Console.WriteLine("Player authenticated with {0}", value);
-				if (value != AUTHENTICATION_CLIENT_VALUE)
-					throw new ApplicationException("Player authenticated with invalid value.");
-			}
-		}
-
-		/// <summary>
-		/// The UsernameAndPasswordState is the second state, when the client submits a username and
-		/// password which the server confirms or denies. We should log the number of attempts in the
-		/// future.
-		/// </summary>
-		class UsernameAndPasswordState : NetworkState
-		{
-			private const int LOGIN_SUCCESSFUL_VALUE = 1337;
-			private bool loggedIn = false;
-
-			public NetworkState Send(Server server)
-			{
-				if (loggedIn)
-				{
-					Console.WriteLine("{0} successfully logged in with {1}", server.player.Name, server.player.Password);
-					server.Write(BitConverter.GetBytes(LOGIN_SUCCESSFUL_VALUE), 0, 4);
-					return new PositionState();
-				}
-				else
-					//This should retry in the future, rather than closing the server
-					throw new ApplicationException("Login failed");
-			}
-
-			public void Receive(Server server) 
-			{
-				try
-				{
-					int length = server.ReadInt();
-					if (length > Player.MAX_PLAYER_NAME_LENGTH)
-						throw new ApplicationException(String.Format("Name too long: {0} characters", length));
-
-					String name = server.ReadString((uint)length);
-					Console.WriteLine("Player attempted to join with name: " + name);
-
-					server.player = players.FindPlayer(name);
-
-					if (server.player == null)
-						throw new ApplicationException("Player not found");
-					if (server.player.LoggedIn)
-						throw new ApplicationException("Player " + server.player.Name + " already logged in");
-
-					String password = server.ReadString(128);
-					if (!server.player.Password.Equals(password))
-						throw new ApplicationException(String.Format("Player gave invalid password {0}.", password));
-
-					
-					Player updatedPlayer = new Player(server.player);
-					updatedPlayer.LoggedIn = true;
-					if (players.TryUpdate(name, updatedPlayer, server.player))
-						loggedIn = true;
-				}
-				catch (ApplicationException e)
-				{
-					Console.WriteLine(e.Message);
-				}
-			}
-		}
-
-		/// <summary>
-		/// The PositionState is the third state, when the position information is transmitted.
-		/// This is the primary state. It will be expanded in the future. Each player tells the
-		/// server its position then reads the position of nearby players other than itself
-		/// from the server. We will also need to check the logic in the future.
-		/// </summary>
-		class PositionState : NetworkState
-		{
-			public NetworkState Send(Server server)
-			{
-				//Find the first other player.
-				List<Player> otherPlayers = players.GetNearbyPlayers(server.player.Name);
-				int numNearbyPlayers = otherPlayers.Count;
-
-				//Write the number of players for which we are going to send data
-				server.Write(BitConverter.GetBytes(numNearbyPlayers), 0, 4);
-
-				WritePlayerData(server, otherPlayers);
-
-				return this;
-			}
-
-			public void Receive(Server server)
-			{
-				Position newPos;
-				newPos.x = server.ReadSingle();
-				newPos.y = server.ReadSingle();
-				server.player.Position = newPos;
-				//Console.WriteLine("Read position ({0},{1})",newPos.x, newPos.y);
-			}
-
-			private void WritePlayerData(Server server, IList<Player> otherPlayers)
-			{
-				byte[] buffer = new byte[otherPlayers.Count * 8];
-				int index = 0;
-				//Write the data for each player into a buffer
-				foreach (Player p in otherPlayers)
-				{
-					Buffer.BlockCopy(BitConverter.GetBytes(p.Position.x), 0, buffer, index, 4);
-					Buffer.BlockCopy(BitConverter.GetBytes(p.Position.y), 0, buffer, index + 4, 4);
-					//Console.Write("({0}, {1})",p.Position.x, p.Position.y);
-
-					index += 8;
-					//Check for buffer full
-				}
-
-				//Write the buffer of player data
-				server.Write(buffer, 0, index);
-			}
 		}
 	}
 }
