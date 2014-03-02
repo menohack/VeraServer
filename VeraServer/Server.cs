@@ -80,8 +80,17 @@ namespace VeraServer
 			{
 				stream = client.GetStream();
 				StreamWriter writer = new StreamWriter(stream);
-				writer.Write("HTTP/1.1 200 OK\n\r\n");
-				writer.WriteLine("hello world!");
+				StreamReader reader = new StreamReader(stream);
+
+				string message = reader.ReadLine();
+				Console.WriteLine("Request: \"" + message + "\"");
+				if (message == "Map plz")
+				{
+					Console.WriteLine("Responded");
+					writer.WriteLine("Here it is");
+				}
+				else
+					Console.WriteLine("Wrong request");
 				writer.Close();
 				//closeServer(this);
 			}
