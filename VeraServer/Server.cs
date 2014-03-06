@@ -50,6 +50,8 @@ namespace VeraServer
 		/// </summary>
 		private ListenServer.CloseServerDelegate closeServer;
 
+		private Model game = new Game();
+
 		/// <summary>
 		/// Construct the Server.
 		/// </summary>
@@ -87,7 +89,7 @@ namespace VeraServer
 				if (message == "Map plz")
 				{
 					Console.WriteLine("Responded");
-					writer.WriteLine("Here it is");
+					writer.WriteLine("{0}", game.RandomTerrain());
 				}
 				else
 					Console.WriteLine("Wrong request");
