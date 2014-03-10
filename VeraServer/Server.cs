@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Collections.Generic;
 using System.Text;
 using System.IO;
+using VeraLibrary;
 
 namespace VeraServer
 {
@@ -50,7 +51,7 @@ namespace VeraServer
 		/// </summary>
 		private ListenServer.CloseServerDelegate closeServer;
 
-		private Model game = new Game();
+		public VeraLibrary.Model game = new VeraLibrary.Game();
 
 		/// <summary>
 		/// Construct the Server.

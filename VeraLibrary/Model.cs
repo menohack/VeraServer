@@ -1,18 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Xml.Serialization;
 using System.Runtime.Serialization;
 using System.Xml;
 
-namespace VeraServer
+namespace VeraLibrary
 {
 	public enum TerrainType
 	{
 		Ore, Trees, Water, Fertile
 	}
 
-	interface Model
+	public interface Model
 	{
 		TerrainType RandomTerrain();
 	}

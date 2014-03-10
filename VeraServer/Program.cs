@@ -1,4 +1,6 @@
-﻿namespace VeraServer
+﻿using VeraLibrary;
+
+namespace VeraServer
 {
 	class Program
 	{
